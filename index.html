@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>솜하치 고민상담소 🌙</title>
+  
+  <!-- React & React DOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel CDN (JSX 변환용) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+
+    body {
+      background-color: #0d0d12;
+      color: #ffffff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d0d12;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #ff007f;
+      border-radius: 4px;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.1); opacity: 1; text-shadow: 0 0 20px #ff66a3; }
+      100% { transform: scale(1); opacity: 0.8; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes glow {
+      0% { text-shadow: 0 0 5px #fff, 0 0 10px #ff007f, 0 0 20px #ff007f; }
+      50% { text-shadow: 0 0 10px #fff, 0 0 20px #ff007f, 0 0 40px #ff007f, 0 0 60px #ff007f; }
+      100% { text-shadow: 0 0 5px #fff, 0 0 10px #ff007f, 0 0 20px #ff007f; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // 랜덤 닉네임 단어 조합
+    const ADJECTIVES = ['포근한', '달콤한', '은은한', '반짝이는', '조용한', '수줍은', '따뜻한', '몽환적인', '신비로운', '아늑한'];
+    const NOUNS = ['토끼', '푸딩', '구름', '별빛', '복숭아', '마카롱', '아기곰', '달빛', '솜사탕', '고양이'];
+
+    const generateRandomNickname = () => {
+      const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+      const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+      const num = Math.floor(100 + Math.random() * 900);
+      return `${adj} ${noun} #${num}`;
+    };
+
+    function App() {
+      const [view, setView] = useState('home'); // 'home', 'login', 'admin'
+      const [senderType, setSenderType] = useState('anonymous'); // 'anonymous', 'nickname'
+      const [nickname, setNickname] = useState(generateRandomNickname());
+      const [story, setStory] = useState('');
+      const [agreed, setAgreed] = useState(false);
+      const [stories, setStories] = useState([]);
+      const [password, setPassword] = useState('');
+      const [loginError, setLoginError] = useState(false);
+      const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+      const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
+      const [deleteTargetId, setDeleteTargetId] = useState(null);
+
+      // 데이터 불러오기 (Local Storage 기본)
+      useEffect(() => {
+        const saved = localStorage.getItem('somhachi_stories');
+        if (saved) {
+          try {
+            setStories(JSON.parse(saved));
+          } catch(e) {
+            setStories([]);
+          }
+        }
+      }, []);
+
+      // 데이터 저장
+      const saveStories = (newStories) => {
+        setStories(newStories);
+        localStorage.setItem('somhachi_stories', JSON.stringify(newStories));
+      };
+
+      const handleRerollNickname = () => {
+        setNickname(generateRandomNickname());
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!agreed || story.trim() === '') return;
+
+        const newEntry = {
+          id: Date.now(),
+          sender: senderType === 'anonymous' ? '익명' : nickname,
+          content: story,
+          date: new Date().toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          isRead: false
+        };
+
+        const updated = [newEntry, ...stories];
+        saveStories(updated);
+
+        setStory('');
+        setAgreed(false);
+        if (senderType === 'nickname') setNickname(generateRandomNickname());
+
+        setShowSuccessMessage(true);
+        setTimeout(() => setShowSuccessMessage(false), 3500);
+      };
+
+      const handleAdminLogin = (e) => {
+        e.preventDefault();
+        if (password === '1234') { // 관리자 비밀번호
+          setView('admin');
+          setPassword('');
+          setLoginError(false);
+        } else {
+          setLoginError(true);
+        }
+      };
+
+      const toggleReadStatus = (id) => {
+        const updated = stories.map(s => s.id === id ? { ...s, isRead: !s.isRead } : s);
+        saveStories(updated);
+      };
+
+      const confirmDelete = (id) => {
+        setDeleteTargetId(id);
+      };
+
+      const executeDelete = () => {
+        if (!deleteTargetId) return;
+        const updated = stories.filter(s => s.id !== deleteTargetId);
+        saveStories(updated);
+        setDeleteTargetId(null);
+      };
+
+      const filteredStories = stories.filter(s => {
+        if (filter === 'unread') return !s.isRead;
+        if (filter === 'read') return s.isRead;
+        return true;
+      });
+
+      return (
+        <div style={styles.container}>
+          {/* 상단 고정 내비게이션 바 */}
+          <nav style={styles.navbar}>
+            {view === 'home' ? (
+              <button style={styles.neonButtonSmall} onClick={() => setView('login')}>
+                ✨ 사연 읽기 (관리자)
+              </button>
+            ) : (
+              <button style={styles.neonButtonSmall} onClick={() => { setView('home'); setPassword(''); }}>
+                🏠 홈으로 돌아가기
+              </button>
+            )}
+          </nav>
+
+          <main style={styles.main}>
+            {view === 'home' && (
+              <div style={styles.contentWrapper}>
+                <h1 style={styles.neonTitle}>솜하치 고민상담소</h1>
+                <p style={styles.subtitle}>당신의 소중한 이야기를 밤하늘 아래 조용히 들어줄게요.</p>
+
+                <div style={styles.statsBox}>
+                  <span style={styles.heartPulse}>💖</span>
+                  <span style={styles.statsText}>현재까지 쌓인 마음: {stories.length}개</span>
+                </div>
+
+                {/* 작성 예시 안내 */}
+                <div style={styles.exampleBox}>
+                  <h3 style={styles.exampleTitle}>💡 이런 이야기를 편하게 적어주세요</h3>
+                  <ul style={styles.exampleList}>
+                    <li>"요즘 인간관계 때문에 밤에 잠이 안 와요..." (깊은 고민)</li>
+                    <li>"오늘 카페에서 좋아하는 노래가 나와서 기분이 좋았어요!" (소소한 일상)</li>
+                    <li>"솜하치님, 이번 시험 꼭 잘 보라고 응원 한번 해주세요!" (응원 요청)</li>
+                  </ul>
+                </div>
+
+                {/* 중요 안내사항 (방송 노출 및 익명 관련) */}
+                <div style={styles.warningBox}>
+                  <h3 style={styles.warningTitle}>⚠️ 사연 작성 전 꼭 확인해주세요!</h3>
+                  <p style={styles.warningText}>
+                    • 보낸 사연은 **라이브 방송에서 읽힐 수 있습니다.**<br />
+                    • 모든 사연은 작성자의 비밀이 철저히 보호되며, **100% 익명 또는 선택하신 닉네임**으로 안전하게 전달됩니다.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmit} style={styles.form}>
+                  {/* 보내는 사람 형태 선택 */}
+                  <div style={styles.senderSection}>
+                    <label style={styles.senderLabel}>보내는 사람:</label>
+                    <div style={styles.radioGroup}>
+                      <label style={styles.radioLabel}>
+                        <input
+                          type="radio"
+                          name="sender"
+                          checked={senderType === 'anonymous'}
+                          onChange={() => setSenderType('anonymous')}
+                        />
+                        <span>익명</span>
+                      </label>
+                      <label style={styles.radioLabel}>
+                        <input
+                          type="radio"
+                          name="sender"
+                          checked={senderType === 'nickname'}
+                          onChange={() => setSenderType('nickname')}
+                        />
+                        <span>랜덤 닉네임</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {senderType === 'nickname' && (
+                    <div style={styles.nicknameBox}>
+                      <span style={styles.nicknameDisplay}>🌸 {nickname}</span>
+                      <button type="button" onClick={handleRerollNickname} style={styles.rerollBtn}>
+                        🎲 다시 뽑기
+                      </button>
+                    </div>
+                  )}
+
+                  <textarea
+                    style={styles.textarea}
+                    placeholder="여기에 마음속 이야기를 남겨주세요..."
+                    value={story}
+                    onChange={(e) => setStory(e.target.value)}
+                  />
+
+                  {/* 동의 체크박스 */}
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={agreed}
+                      onChange={(e) => setAgreed(e.target.checked)}
+                      style={styles.checkbox}
+                    />
+                    <span>[필수] 사연이 방송에서 공개될 수 있음을 확인하였으며 이에 동의합니다.</span>
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={!agreed || story.trim() === ''}
+                    style={{
+                      ...styles.neonButton,
+                      opacity: (!agreed || story.trim() === '') ? 0.4 : 1,
+                      cursor: (!agreed || story.trim() === '') ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    사연 보내기 💌
+                  </button>
+                </form>
+
+                {showSuccessMessage && (
+                  <div style={styles.successMessage}>
+                    ✨ 사연이 안전하게 전달되었어요! 솜하치가 소중히 읽어볼게요.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {view === 'login' && (
+              <div style={styles.contentWrapper}>
+                <h1 style={styles.neonTitleSmall}>관리자 로그인</h1>
+                <p style={styles.subtitle}>솜하치님 전용 사연함입니다.</p>
+                <form onSubmit={handleAdminLogin} style={styles.loginForm}>
+                  <input
+                    type="password"
+                    placeholder="비밀번호 입력 (기본: 1234)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={styles.input}
+                    autoFocus
+                  />
+                  <button type="submit" style={styles.neonButton}>입장하기</button>
+                  {loginError && <p style={styles.errorText}>비밀번호가 올바르지 않습니다.</p>}
+                </form>
+              </div>
+            )}
+
+            {view === 'admin' && (
+              <div style={styles.adminWrapper}>
+                <h1 style={styles.neonTitleSmall}>도착한 사연함 💌</h1>
+                <p style={styles.subtitle}>총 {stories.length}개의 마음이 모였습니다.</p>
+
+                {/* 필터 탭 */}
+                <div style={styles.filterBar}>
+                  <button
+                    onClick={() => setFilter('all')}
+                    style={filter === 'all' ? styles.filterActive : styles.filterInactive}
+                  >
+                    전체 ({stories.length})
+                  </button>
+                  <button
+                    onClick={() => setFilter('unread')}
+                    style={filter === 'unread' ? styles.filterActive : styles.filterInactive}
+                  >
+                    미확인 ({stories.filter(s => !s.isRead).length})
+                  </button>
+                  <button
+                    onClick={() => setFilter('read')}
+                    style={filter === 'read' ? styles.filterActive : styles.filterInactive}
+                  >
+                    확인완료 ({stories.filter(s => s.isRead).length})
+                  </button>
+                </div>
+
+                <div style={styles.storyList}>
+                  {filteredStories.length === 0 ? (
+                    <p style={styles.noStoryText}>해당하는 사연이 없습니다.</p>
+                  ) : (
+                    filteredStories.map((s) => (
+                      <div
+                        key={s.id}
+                        style={{
+                          ...styles.storyCard,
+                          opacity: s.isRead ? 0.6 : 1,
+                          borderLeft: s.isRead ? '4px solid #888' : '4px solid #ff007f'
+                        }}
+                      >
+                        <div style={styles.storyHeader}>
+                          <div>
+                            <span style={styles.senderBadge}>{s.sender || '익명'}</span>
+                            <span style={styles.storyDate}>{s.date}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <label style={styles.readToggleLabel}>
+                              <input
+                                type="checkbox"
+                                checked={s.isRead || false}
+                                onChange={() => toggleReadStatus(s.id)}
+                              />
+                              <span>{s.isRead ? '읽음' : '안읽음'}</span>
+                            </label>
+                            <button onClick={() => confirmDelete(s.id)} style={styles.deleteButton}>
+                              삭제
+                            </button>
+                          </div>
+                        </div>
+                        <p style={{
+                          ...styles.storyContent,
+                          textDecoration: s.isRead ? 'line-through' : 'none',
+                          color: s.isRead ? '#aaa' : '#fff'
+                        }}>
+                          {s.content}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* 삭제 확인 커스텀 모달 */}
+          {deleteTargetId && (
+            <div style={styles.modalOverlay}>
+              <div style={styles.modalBox}>
+                <h3 style={{ color: '#ff66a3', marginBottom: '15px' }}>🗑️ 사연 삭제</h3>
+                <p style={{ color: '#ddd', marginBottom: '20px' }}>정말로 이 사연을 삭제하시겠습니까?</p>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                  <button onClick={executeDelete} style={styles.modalDeleteBtn}>삭제하기</button>
+                  <button onClick={() => setDeleteTargetId(null)} style={styles.modalCancelBtn}>취소</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const styles = {
+      container: {
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        background: 'radial-gradient(circle at 50% 30%, #1a0a14 0%, #080507 100%)',
+      },
+      navbar: {
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        width: '100%',
+        padding: '20px 30px',
+        display: 'flex',
+        justifyContent: 'flex-end',
+        zIndex: 1000,
+      },
+      main: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '90px 20px 50px 20px',
+      },
+      contentWrapper: {
+        width: '100%',
+        maxWidth: '650px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        animation: 'fadeIn 0.6s ease-out',
+      },
+      neonTitle: {
+        fontSize: '2.4rem',
+        fontWeight: '700',
+        color: '#fff',
+        animation: 'glow 3s infinite',
+        marginBottom: '10px',
+        textAlign: 'center',
+      },
+      neonTitleSmall: {
+        fontSize: '1.8rem',
+        fontWeight: '700',
+        color: '#fff',
+        textShadow: '0 0 10px #ff007f',
+        marginBottom: '10px',
+      },
+      subtitle: {
+        color: '#ffb3d1',
+        fontSize: '1rem',
+        marginBottom: '25px',
+        textAlign: 'center',
+      },
+      statsBox: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '20px',
+        padding: '8px 18px',
+        borderRadius: '20px',
+        background: 'rgba(255, 0, 127, 0.12)',
+        border: '1px solid rgba(255, 0, 127, 0.4)',
+      },
+      heartPulse: {
+        fontSize: '1.2rem',
+        animation: 'pulse 2s infinite',
+      },
+      statsText: {
+        color: '#fff',
+        fontSize: '0.95rem',
+        fontWeight: 'bold',
+      },
+      exampleBox: {
+        width: '100%',
+        background: 'rgba(255, 0, 127, 0.05)',
+        border: '1px solid rgba(255, 0, 127, 0.25)',
+        borderRadius: '12px',
+        padding: '16px',
+        marginBottom: '15px',
+      },
+      exampleTitle: {
+        color: '#ff66a3',
+        fontSize: '1rem',
+        marginBottom: '10px',
+      },
+      exampleList: {
+        paddingLeft: '18px',
+        color: '#e0c8d1',
+        fontSize: '0.88rem',
+        lineHeight: '1.6',
+      },
+      warningBox: {
+        width: '100%',
+        background: 'rgba(255, 50, 50, 0.08)',
+        border: '1px solid rgba(255, 100, 100, 0.4)',
+        borderRadius: '12px',
+        padding: '16px',
+        marginBottom: '20px',
+      },
+      warningTitle: {
+        color: '#ff6b6b',
+        fontSize: '0.98rem',
+        marginBottom: '8px',
+      },
+      warningText: {
+        color: '#ffd1d1',
+        fontSize: '0.86rem',
+        lineHeight: '1.6',
+      },
+      form: {
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+      },
+      senderSection: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '15px',
+      },
+      senderLabel: {
+        color: '#ffb3d1',
+        fontSize: '0.95rem',
+        fontWeight: 'bold',
+      },
+      radioGroup: {
+        display: 'flex',
+        gap: '20px',
+      },
+      radioLabel: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        color: '#fff',
+        cursor: 'pointer',
+        fontSize: '0.9rem',
+      },
+      nicknameBox: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'rgba(255, 0, 127, 0.1)',
+        padding: '10px 16px',
+        borderRadius: '8px',
+        border: '1px dashed #ff66a3',
+      },
+      nicknameDisplay: {
+        color: '#ffb3d1',
+        fontWeight: 'bold',
+        fontSize: '0.95rem',
+      },
+      rerollBtn: {
+        background: 'transparent',
+        border: 'none',
+        color: '#ff66a3',
+        cursor: 'pointer',
+        fontSize: '0.85rem',
+        fontWeight: 'bold',
+      },
+      textarea: {
+        width: '100%',
+        minHeight: '180px',
+        padding: '16px',
+        borderRadius: '12px',
+        background: 'rgba(20, 10, 15, 0.85)',
+        border: '2px solid #ff007f',
+        color: '#fff',
+        fontSize: '1rem',
+        lineHeight: '1.6',
+        resize: 'vertical',
+        outline: 'none',
+        boxShadow: '0 0 10px rgba(255, 0, 127, 0.2)',
+      },
+      checkboxLabel: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '10px',
+        color: '#e0c8d1',
+        fontSize: '0.85rem',
+        cursor: 'pointer',
+        lineHeight: '1.4',
+      },
+      checkbox: {
+        marginTop: '2px',
+        accentColor: '#ff007f',
+      },
+      neonButton: {
+        padding: '14px',
+        borderRadius: '25px',
+        border: '2px solid #ff007f',
+        background: 'rgba(255, 0, 127, 0.2)',
+        color: '#fff',
+        fontSize: '1.1rem',
+        fontWeight: 'bold',
+        textShadow: '0 0 8px #ff007f',
+        boxShadow: '0 0 12px rgba(255, 0, 127, 0.4)',
+        transition: 'all 0.3s',
+      },
+      neonButtonSmall: {
+        padding: '8px 18px',
+        borderRadius: '20px',
+        border: '1px solid #ff66a3',
+        background: 'rgba(20, 10, 15, 0.8)',
+        color: '#fff',
+        fontSize: '0.88rem',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        boxShadow: '0 0 8px rgba(255, 0, 127, 0.4)',
+      },
+      successMessage: {
+        marginTop: '15px',
+        padding: '12px 20px',
+        background: 'rgba(255, 0, 127, 0.2)',
+        border: '1px solid #ff66a3',
+        borderRadius: '10px',
+        color: '#fff',
+        textAlign: 'center',
+        fontSize: '0.95rem',
+        width: '100%',
+      },
+      loginForm: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        width: '100%',
+        maxWidth: '320px',
+      },
+      input: {
+        padding: '12px',
+        borderRadius: '8px',
+        background: 'rgba(20, 10, 15, 0.8)',
+        border: '1px solid #ff66a3',
+        color: '#fff',
+        fontSize: '1rem',
+        textAlign: 'center',
+        outline: 'none',
+      },
+      errorText: {
+        color: '#ff4d4d',
+        textAlign: 'center',
+        fontSize: '0.85rem',
+      },
+      adminWrapper: {
+        width: '100%',
+        maxWidth: '750px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      },
+      filterBar: {
+        display: 'flex',
+        gap: '10px',
+        marginBottom: '20px',
+      },
+      filterActive: {
+        padding: '6px 14px',
+        borderRadius: '15px',
+        background: '#ff007f',
+        border: 'none',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: '0.85rem',
+        cursor: 'pointer',
+      },
+      filterInactive: {
+        padding: '6px 14px',
+        borderRadius: '15px',
+        background: 'rgba(255, 255, 255, 0.1)',
+        border: '1px solid #555',
+        color: '#aaa',
+        fontSize: '0.85rem',
+        cursor: 'pointer',
+      },
+      storyList: {
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '15px',
+      },
+      noStoryText: {
+        textAlign: 'center',
+        color: '#888',
+        marginTop: '40px',
+      },
+      storyCard: {
+        background: 'rgba(25, 12, 20, 0.75)',
+        border: '1px solid rgba(255, 0, 127, 0.2)',
+        borderRadius: '12px',
+        padding: '18px',
+        transition: 'all 0.3s',
+      },
+      storyHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '12px',
+        paddingBottom: '10px',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      },
+      senderBadge: {
+        background: 'rgba(255, 0, 127, 0.25)',
+        color: '#ff66a3',
+        padding: '3px 10px',
+        borderRadius: '12px',
+        fontSize: '0.82rem',
+        fontWeight: 'bold',
+        marginRight: '10px',
+      },
+      storyDate: {
+        color: '#888',
+        fontSize: '0.82rem',
+      },
+      readToggleLabel: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '5px',
+        color: '#aaa',
+        fontSize: '0.82rem',
+        cursor: 'pointer',
+      },
+      deleteButton: {
+        background: 'transparent',
+        border: '1px solid #ff4d4d',
+        color: '#ff4d4d',
+        padding: '3px 10px',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontSize: '0.78rem',
+      },
+      storyContent: {
+        lineHeight: '1.6',
+        whiteSpace: 'pre-wrap',
+        fontSize: '0.98rem',
+      },
+      modalOverlay: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2000,
+      },
+      modalBox: {
+        background: '#1a0d16',
+        border: '1px solid #ff007f',
+        borderRadius: '12px',
+        padding: '24px',
+        textAlign: 'center',
+        maxWidth: '320px',
+        width: '90%',
+      },
+      modalDeleteBtn: {
+        background: '#ff4d4d',
+        color: '#fff',
+        border: 'none',
+        padding: '8px 16px',
+        borderRadius: '6px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+      },
+      modalCancelBtn: {
+        background: '#444',
+        color: '#fff',
+        border: 'none',
+        padding: '8px 16px',
+        borderRadius: '6px',
+        cursor: 'pointer',
+      }
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
